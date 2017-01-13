@@ -59,6 +59,8 @@ int main(int argc, char **argv)
 	 *
 	*/
 
+	fprintf(stderr, "Loading RTx file: %s\n",infiles[1]);
+
 	DcmFileFormat fileformat;
   	if (fileformat.loadFile(infiles[1]).good()){
   		// Load the DICOM-RT dataset
@@ -73,6 +75,9 @@ int main(int argc, char **argv)
   			if(ROIContourSequence->findAndGetSequence(DCM_ContourSequence, pContourSequnce, true).good()){
   				// Get the number of contour sequences in the file
   				Uint16 numimages = pContourSequnce->card();
+
+  				fprintf(stderr, "\tFound %d contour data entries in the RTx file.\n",numimages);
+
   				for( int iter=0; iter<numimages; iter++){
 
   					// Get each ContourSequence at a time
@@ -138,6 +143,8 @@ int main(int argc, char **argv)
 	 *
 	 * We can only work with minc 2.0 files */
 
+  	fprintf(stderr, "Loading PET file: %s\n",infiles[0]);
+
 	system("mkdir /tmp/minc_plugins/");
 	std::string in1 = "mincconvert -clobber ";
 	in1 += infiles[0];
@@ -164,14 +171,11 @@ int main(int argc, char **argv)
 		micopy_dimension(dimensions[i], &dimensions_new[i]);
 	}
 
+	fprintf(stderr, "\tDimensions of PET file: %dx%dx%d\n",sizes[0],sizes[1],sizes[2]);
+
 	// allocate memory for the hyperslab - make it size of entire volume
 	start[0] = start[1] = start[2] = 0;
-	slab = (double *) malloc(sizeof(double) * sizes[0] * sizes[1] * sizes[2]);
 	slab_new = (double *) malloc(sizeof(double) * sizes[0] * sizes[1] * sizes[2]);
-	if (miget_real_value_hyperslab(container_volume, MI_TYPE_DOUBLE, start, count, slab) != MI_NOERROR) {
-		fprintf(stderr, "Error getting hyperslab for file 1\n");
-		return(1);
-	}
 
 	// Initialize new hyperslab for the label file with zeros everywhere
   	for (i=0; i < sizes[0] * sizes[1] * sizes[2]; i++) {
@@ -197,7 +201,9 @@ int main(int argc, char **argv)
 			slab_new[contour_voxel] = 1.0;
 		}
 	}
-	
+
+	fprintf(stderr, "Writing volume and data to file: %s\n",outfiles[0]);
+
 	// create the new volume 
 	if (micreate_volume("/tmp/minc_plugins/label_volume.mnc", 3, dimensions_new, MI_TYPE_UBYTE,
 	MI_CLASS_REAL, NULL, &label_volume) != MI_NOERROR) {
@@ -213,7 +219,7 @@ int main(int argc, char **argv)
 		
 	// set valid and real range 
 	miset_volume_valid_range(label_volume, 255, 0);
-	miset_volume_range(label_volume, 2, 0);
+	miset_volume_range(label_volume, 32, 0);
 
 	// write the modified hyperslab to the file 
 	if (miset_real_value_hyperslab(label_volume, MI_TYPE_DOUBLE,
@@ -237,6 +243,8 @@ int main(int argc, char **argv)
 	system(s_outfiles.c_str());
 	
 	system("rm -rf /tmp/minc_plugins/");
+
+	fprintf(stderr, "Finished rtx2mnc\n");
 
 	return(0);
 }
